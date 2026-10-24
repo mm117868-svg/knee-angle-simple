@@ -6,7 +6,7 @@ import {readFile} from 'node:fs/promises';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 
-async function harness(){
+async function harness(useWorld=false){
   const camera=deferred(), engine=deferred(), elements=new Map(), events={}, frames=new Map(), timers=new Map();
   let serial=0,time=100,stops=0,closes=0;
   const context2d=new Proxy({}, {get:()=>()=>{},set:()=>true});
@@ -21,7 +21,7 @@ async function harness(){
   const track={stop(){stops++;},getSettings:()=>({facingMode:'user'}),addEventListener(){}};
   const stream={getTracks:()=>[track],getVideoTracks:()=>[track]};
   const model={close(){closes++;},detectForVideo(){return {landmarks:[]};}};
-  const document={hidden:false,getElementById:el,addEventListener:(name,fn)=>events[name]=fn};
+  const document={documentElement:{dataset:{poseSpace:useWorld?'world':'image'}},hidden:false,getElementById:el,addEventListener:(name,fn)=>events[name]=fn};
   const sandbox=vm.createContext({document,window:{isSecureContext:true,addEventListener:(name,fn)=>events[name]=fn},
     navigator:{mediaDevices:{getUserMedia:()=>camera.promise}},performance:{now:()=>time},URL,Date,Math,console,
     setTimeout:(fn,ms)=>{const id=++serial;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
@@ -33,7 +33,8 @@ async function harness(){
   const geometry=new vm.SourceTextModule(await readFile(new URL('../src/measurement.mjs',import.meta.url),'utf8'),{context:sandbox});
   const app=new vm.SourceTextModule(await readFile(new URL('../src/app.mjs',import.meta.url),'utf8'),{
     context:sandbox,initializeImportMeta:meta=>meta.url=new URL('../src/app.mjs',import.meta.url).href,importModuleDynamically:()=>vision});
-  await app.link(()=>geometry);await app.evaluate();
+  const worldView=new vm.SyntheticModule(['WorldView'],function(){this.setExport('WorldView',class {update(){} reset(){}});},{context:sandbox});
+  await app.link(specifier=>specifier.includes('world-view')?worldView:geometry);await app.evaluate();
   return {el,camera,engine,stream,model,events,timers,document,
     click:id=>el(id).handlers.click(),stats:()=>({stops,closes}),
     async ready(){this.click('start');camera.resolve(stream);engine.resolve(model);await settle();},
@@ -93,4 +94,22 @@ test('readout updates slowly while invalid tracking still clears it immediately'
   h.frame(400);assert.ok(Number(h.el('angle').textContent)>0 && Number(h.el('angle').textContent)<90);
   h.model.detectForVideo=()=>({landmarks:[]});h.frame(500);assert.equal(h.el('angle').textContent,'--');
   h.model.detectForVideo=()=>({landmarks:[landmarks]});h.frame(600);assert.equal(h.el('angle').textContent,'90');
+});
+
+
+test('3D mode uses world depth and never substitutes a 2D angle',async()=>{
+  const h=await harness(true);await h.ready();
+  const image=Array.from({length:33},()=>({x:.5,y:.5,visibility:1,presence:1}));
+  image[24].y=.1;image[28].y=.9;
+  const world=Array.from({length:33},()=>({x:0,y:0,z:0,visibility:1}));
+  world[24]={x:0,y:-.4,z:0,visibility:1};world[28]={x:0,y:0,z:.4,visibility:1};
+  h.model.detectForVideo=()=>({landmarks:[image],worldLandmarks:[world]});h.frame(100);
+  assert.equal(h.el('angle').textContent,'90');
+  h.click('capture');for(let t=200;t<=2300;t+=100)h.frame(t);
+  assert.equal(h.el('saved-angle').textContent,'90°');
+  assert.match(h.el('saved-detail').textContent,/Estimated 3D/);
+  h.model.detectForVideo=()=>({landmarks:[image]});h.frame(2400);
+  assert.equal(h.el('angle').textContent,'--');assert.equal(h.el('capture').disabled,true);
+  h.model.detectForVideo=()=>({landmarks:[image],worldLandmarks:[world]});h.frame(2500);
+  image[26].visibility=.1;h.frame(2600);assert.equal(h.el('angle').textContent,'--');
 });

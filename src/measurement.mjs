@@ -22,6 +22,46 @@ export function kneeBend(landmarks, side, width, height) {
   return 180 - Math.acos(cosine) * 180 / Math.PI;
 }
 
+// World coordinates have a shared metric scale. Do not multiply these by
+// image dimensions or use normalised image z as a third spatial axis.
+export function worldVisible(point, threshold = 0.5) {
+  return !!point && ['x','y','z'].every(key => Number.isFinite(point[key]))
+    && Number.isFinite(point.visibility) && point.visibility >= threshold
+    && (point.presence == null || Number.isFinite(point.presence) && point.presence >= threshold);
+}
+
+export function kneeBend3D(world, image, side) {
+  if (!SIDES[side]) return null;
+  const ids=SIDES[side];
+  if (!ids.every(i=>visible(image?.[i]) && worldVisible(world?.[i]))) return null;
+  const [hip,knee,ankle]=ids.map(i=>world[i]);
+  const a=['x','y','z'].map(k=>hip[k]-knee[k]);
+  const b=['x','y','z'].map(k=>ankle[k]-knee[k]);
+  const upper=Math.hypot(...a), lower=Math.hypot(...b);
+  if (Math.min(upper,lower)<0.04) return null;
+  const cosine=Math.max(-1,Math.min(1,a.reduce((sum,v,i)=>sum+v*b[i],0)/(upper*lower)));
+  return 180-Math.acos(cosine)*180/Math.PI;
+}
+
+export class WorldSmoother {
+  constructor() { this.reset(); }
+  reset() { this.points=[]; this.lastTime=null; }
+  add(world,image,time) {
+    if (!world?.length || !Number.isFinite(time)) { this.reset(); return null; }
+    const dt=this.lastTime==null ? 0 : time-this.lastTime;
+    if (this.lastTime==null || dt<=0 || dt>400) this.points=[];
+    this.lastTime=time;
+    const alpha=1-Math.exp(-Math.max(0,dt)/160);
+    this.points=world.map((point,i)=>{
+      if (!worldVisible(point,0.35) || !visible(image?.[i],0.35)) return null;
+      const previous=this.points[i];
+      if (!previous) return {...point};
+      return {...point,...Object.fromEntries(['x','y','z'].map(k=>[k,previous[k]+alpha*(point[k]-previous[k])]))};
+    });
+    return this.points;
+  }
+}
+
 export function mean(values) { return values.reduce((a,b) => a+b,0) / values.length; }
 export function robustMean(values) {
   if (!values.length) return null;

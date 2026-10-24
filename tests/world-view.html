@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>3D view check</title><link rel="stylesheet" href="../style.css?v=3"><body><main><h1>Synthetic 3D view check</h1><p>Generated coordinates, not a patient measurement.</p><button id="load">Show test pose</button><button id="clear-test">Clear tracking</button><p id="result">Loading fixture</p><div id="fixture"></div></main><script type="module">
+import {WorldView} from '../src/world-view.mjs?v=3';
+import {kneeBend3D} from '../src/measurement.mjs?v=3';
+const html=await (await fetch('../3d.html')).text();
+const section=new DOMParser().parseFromString(html,'text/html').querySelector('.world-panel');
+document.querySelector('#fixture').append(section);
+const view=new WorldView(document.querySelector('#world-canvas'),document.querySelector('#coordinates'),document.querySelector('#reset-view'));
+const world=Array.from({length:33},()=>({x:0,y:-.7,z:0,visibility:1,presence:1}));
+const set=(i,x,y,z=0)=>world[i]={x,y,z,visibility:1,presence:1};
+set(11,-.2,-.55);set(12,.2,-.55);set(13,-.35,-.3);set(14,.35,-.3);set(15,-.4,-.05);set(16,.4,-.05);
+for(let i=17;i<=22;i++)set(i,i%2?-.42:.42,0,.02*(i-17));
+set(23,-.12,0);set(24,.12,0);set(25,-.12,.4);set(26,.12,.4);set(27,-.12,.8);set(28,.12,.4,-.4);
+set(29,-.12,.82);set(30,.12,.42,-.4);set(31,-.12,.82,-.15);set(32,.12,.42,-.55);
+const image=world.map(()=>({x:.5,y:.5,visibility:1,presence:1}));
+document.querySelector('#load').onclick=()=>{view.update(world,image,'right',performance.now());document.querySelector('#result').textContent=`PASS: synthetic 3D knee bend ${kneeBend3D(world,image,'right').toFixed(0)}°. Expected 90°.`;};
+document.querySelector('#clear-test').onclick=()=>{view.reset();document.querySelector('#result').textContent='Tracking cleared. Coordinates should all show --.';};
+document.querySelector('#result').textContent='Ready';
+</script></body></html>

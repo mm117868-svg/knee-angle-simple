@@ -14,6 +14,16 @@ The front preview is mirrored. Anatomical left and right do not change when the 
 
 ## Measurement
 
+### Separate RGB-to-3D version
+
+Open `3d.html` or follow **Try 3D estimate** on the original page. It uses the same bundled MediaPipe Full model and ordinary RGB camera, but calculates the knee angle from `worldLandmarks` X, Y and Z coordinates. There is no fallback to a 2D angle when world coordinates are unavailable. Both image and world joint confidence must pass the measurement checks.
+
+The page includes the camera overlay, a rotatable 3D skeleton, and estimated hip, knee and ankle positions in centimetres relative to the midpoint of the hips. The inspection view rotates independently of the camera and measurement. World drawing coordinates are smoothed with a 160 ms time constant; the angle uses the same 700 ms trimmed average as the original page. Saved readings average raw 3D angles.
+
+This is monocular depth inference, not RGB-D, LiDAR or a calibrated depth-camera measurement. Metric-looking coordinates are model estimates. The angle is unsigned and does not distinguish hyperextension. This implementation has not been clinically validated, and 3D does not establish better accuracy than the 2D version. All camera processing remains on the device.
+
+### Original 2D version
+
 - Google MediaPipe Tasks Vision **1.1.1**, pinned and bundled, with Pose Landmarker **Full float16 revision 1**. GPU delegate with a CPU fallback.
 - Uses hip, knee and ankle image coordinates converted to pixels before calculating the included angle. This avoids distortions from non-square camera frames.
 - Knee bend = 180° minus the included hip-knee-ankle angle. **0° = straight, 90° = a right-angle bend.** This unsigned 2D angle cannot distinguish hyperextension, assess clinical extension lag, or replace goniometry.

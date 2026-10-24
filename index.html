@@ -7,11 +7,11 @@
   <meta name="description" content="A simple, on-device knee-angle camera with a full-body skeleton. For iPhone and Mac.">
   <title>Knee Angle · Cambridge Kinematics</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=2">
+  <link rel="stylesheet" href="./style.css?v=3">
 </head>
 <body>
   <main>
-    <header><h1>Knee angle</h1></header>
+    <header class="page-heading"><h1>Knee angle</h1><a href="./3d.html">Try 3D estimate</a></header>
     <section class="measurement" aria-label="Knee angle measurement">
       <div class="camera" id="camera-frame">
         <video id="video" autoplay muted playsinline aria-label="Live camera preview"></video>
@@ -61,6 +61,6 @@
     </details>
     <noscript><p class="error">JavaScript is needed to show the skeleton and knee angle. Enable it in your browser and reload.</p></noscript>
   </main>
-  <script type="module" src="./src/app.mjs?v=2"></script>
+  <script type="module" src="./src/app.mjs?v=3"></script>
 </body>
 </html>

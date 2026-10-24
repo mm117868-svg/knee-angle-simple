@@ -1,7 +1,11 @@
-import { SIDES, CONNECTIONS, visible, kneeBend, AngleWindow, LandmarkSmoother, summariseReading } from './measurement.mjs?v=2';
+import { SIDES, CONNECTIONS, visible, kneeBend, kneeBend3D, AngleWindow, LandmarkSmoother, summariseReading } from './measurement.mjs?v=3';
+
+import {WorldView} from './world-view.mjs?v=3';
 
 const $ = id => document.getElementById(id);
 const video=$('video'), canvas=$('overlay'), ctx=canvas.getContext('2d');
+const useWorld=document.documentElement?.dataset.poseSpace==='world';
+const worldView=useWorld ? new WorldView($('world-canvas'),$('coordinates'),$('reset-view')) : null;
 const smoother=new AngleWindow();
 const skeletonSmoother=new LandmarkSmoother();
 let state='idle', generation=0, stream=null, model=null, raf=0;
@@ -31,7 +35,7 @@ function stop(message='Camera stopped. Your last saved reading stays below.') {
   video.pause(); video.srcObject=null;
   try { model?.close(); } catch { /* Camera release must still complete. */ }
   model=null;
-  skeletonSmoother.reset(); lastFrameAt=0;
+  skeletonSmoother.reset(); worldView?.reset(); lastFrameAt=0;
   ctx.clearRect(0,0,canvas.width,canvas.height); clearAngle();
   $('start').textContent='Start camera'; $('camera-choice').disabled=false;
   $('camera-empty').hidden=false; $('camera-label').textContent='Camera off';
@@ -134,7 +138,7 @@ function finishCapture() {
   $('saved-angle').textContent=`${Math.round(result.angle)}°`;
   const time=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   $('saved-meta').textContent=`${data.side==='left'?'Left':'Right'} knee · ${time}`;
-  $('saved-detail').textContent=`Average of ${result.count} clear frames. Observed bend: ${Math.round(result.min)}° to ${Math.round(result.max)}°. Camera estimate.`;
+  $('saved-detail').textContent=`Average of ${result.count} clear frames. Observed bend: ${Math.round(result.min)}° to ${Math.round(result.max)}°. ${useWorld?'Estimated 3D bend from RGB.':'Camera estimate.'}`;
   $('saved').hidden=false;
   status('Reading saved. You can relax your leg.','good');
 }
@@ -144,11 +148,12 @@ function loop(now) {
   if (video.readyState>=2 && video.currentTime!==lastVideoTime && now-lastFrameAt>=65) {
     lastVideoTime=video.currentTime;lastFrameAt=now;
     try {
-      if(canvas.width!==video.videoWidth || canvas.height!==video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;skeletonSmoother.reset();clearAngle();}
+      if(canvas.width!==video.videoWidth || canvas.height!==video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;skeletonSmoother.reset();worldView?.reset();clearAngle();}
       const result=model.detectForVideo(video,now);
       const landmarks=result.landmarks?.[0],side=$('side').value;
       drawSkeleton(skeletonSmoother.add(landmarks,now),side);
-      const angle=kneeBend(landmarks,side,video.videoWidth,video.videoHeight);
+      worldView?.update(result.worldLandmarks?.[0],landmarks,side,now);
+      const angle=useWorld ? kneeBend3D(result.worldLandmarks?.[0],landmarks,side) : kneeBend(landmarks,side,video.videoWidth,video.videoHeight);
       if (angle==null) {
         clearAngle();
         if (!capture) status(`Bring your ${side} hip, knee and ankle clearly into view.`);
@@ -184,7 +189,7 @@ $('capture').addEventListener('click',()=>{
   captureTimer=setTimeout(finishCapture,4000);
 });
 $('side').addEventListener('change',()=>{
-  cancelCapture();clearAngle();skeletonSmoother.reset();ctx.clearRect(0,0,canvas.width,canvas.height);
+  cancelCapture();clearAngle();skeletonSmoother.reset();worldView?.reset();ctx.clearRect(0,0,canvas.width,canvas.height);
   $('leg-label').textContent=$('side').selectedOptions[0].textContent;
   status(state==='running'?`Measuring the ${$('side').value} knee. Keep that side facing the camera.`:'Ready when you are. Start the camera to begin.');
 });
@@ -192,7 +197,7 @@ $('clear').addEventListener('click',()=>{$('saved').hidden=true;});
 // A frozen camera must not leave a stale angle labelled as live.
 setInterval(()=>{
   if(state==='running' && lastFrameAt && performance.now()-lastFrameAt>700){
-    clearAngle();skeletonSmoother.reset();lastFrameAt=0;ctx.clearRect(0,0,canvas.width,canvas.height);
+    clearAngle();skeletonSmoother.reset();worldView?.reset();lastFrameAt=0;ctx.clearRect(0,0,canvas.width,canvas.height);
     status('Waiting for a fresh view of the knee. Keep your leg visible.');
   }
 },250);

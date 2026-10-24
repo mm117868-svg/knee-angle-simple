@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-GB" data-pose-space="world">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f1eb">
+  <meta name="description" content="Estimate 3D joint positions and knee bend from an ordinary iPhone or Mac camera.">
+  <title>3D Knee Angle · Cambridge Kinematics</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=3">
+</head>
+<body>
+  <main>
+    <header class="page-heading"><h1>Knee angle · 3D</h1><a href="./index.html">2D version</a></header>
+    <section class="measurement" aria-label="Knee angle measurement">
+      <div class="camera" id="camera-frame">
+        <video id="video" autoplay muted playsinline aria-label="Live camera preview"></video>
+        <canvas id="overlay" aria-label="Full-body pose skeleton with the selected leg highlighted"></canvas>
+        <div class="camera-empty" id="camera-empty">
+          <span>Side-on view.<br>Keep your whole body in frame.</span>
+        </div>
+        <div class="camera-top"><span id="camera-label">Camera off</span><span id="leg-label">Right knee</span></div>
+        <div class="live-reading">
+          <span class="live-label">AVERAGE 3D KNEE ANGLE</span>
+          <div><output id="angle" aria-label="Estimated 3D knee bend in degrees">--</output><span class="degree">°</span></div>
+          <span>RGB estimate · 0° = straight</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="settings">
+          <label for="side">Knee<select id="side"><option value="right">Right knee</option><option value="left">Left knee</option></select></label>
+          <label for="camera-choice">Camera<select id="camera-choice"><option value="user">Front / Mac</option><option value="environment">Back (phone)</option></select></label>
+        </div>
+        <div class="status" role="status" aria-live="polite"><span id="status-dot"></span><p id="status">Select a knee, then start the camera.</p></div>
+        <div class="actions">
+          <button id="start" class="primary">Start camera</button>
+          <button id="capture" disabled>Save a reading</button>
+        </div>
+        <p class="capture-help" id="capture-help" hidden></p>
+        <section id="saved" class="saved" aria-label="Latest saved reading" hidden>
+          <div class="saved-heading"><span>LAST READING</span><button id="clear" aria-label="Clear saved reading">Clear</button></div>
+          <div class="saved-result"><strong id="saved-angle"></strong><span id="saved-meta"></span></div>
+          <p id="saved-detail"></p>
+        </section>
+      </div>
+    </section>
+    <p class="method-note">Estimated 3D from an ordinary camera. Depth is inferred, not measured. Not clinically validated.</p>
+    <section class="world-panel" aria-label="Estimated 3D joint positions">
+      <div class="world-heading"><h2>Joint positions</h2><button id="reset-view">Reset view</button></div>
+      <p class="world-help">Drag to rotate the skeleton, or focus it and use the arrow keys.</p>
+      <div class="world-layout">
+        <canvas id="world-canvas" tabindex="0" aria-label="Rotatable estimated 3D skeleton. Drag or use arrow keys to rotate."></canvas>
+        <div class="coordinates-panel">
+          <table id="coordinates"><caption>Selected leg · estimated centimetres</caption><thead><tr><th>Joint</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody><tr><th scope="row">Hip</th><td data-coordinate="0-x">--</td><td data-coordinate="0-y">--</td><td data-coordinate="0-z">--</td></tr><tr><th scope="row">Knee</th><td data-coordinate="1-x">--</td><td data-coordinate="1-y">--</td><td data-coordinate="1-z">--</td></tr><tr><th scope="row">Ankle</th><td data-coordinate="2-x">--</td><td data-coordinate="2-y">--</td><td data-coordinate="2-z">--</td></tr></tbody></table>
+          <p>Positions are relative to the midpoint of the hips. X runs across the image, Y downwards and Z into depth. Rotating this view does not change the measurement.</p>
+        </div>
+      </div>
+    </section>
+    <details>
+      <summary>Help</summary>
+      <div class="guidance">
+        <ol>
+          <li>Stand your iPhone or Mac securely to one side. The knee you select should face the camera. Keep one person in the picture.</li>
+          <li>Allow camera access when asked. On iPhone, open this page in Safari. On Mac, use Safari or Chrome.</li>
+          <li>Use good light and keep your hip, knee and ankle uncovered and visible. The orange line shows the measured leg; the pale lines show the rest of your skeleton.</li>
+          <li>Move within a comfortable range. The skeleton is smoothed between frames. The live angle averages the last 0.7 seconds and refreshes up to four times a second, so it will follow movement with a short delay. Stop the camera before moving the device.</li>
+        </ol>
+        <p><strong>What the number means:</strong> this is an approximate bend calculated between the thigh and shin in MediaPipe’s estimated 3D world coordinates. The model infers these positions from a single RGB camera; no depth sensor or LiDAR is used. A straight leg is 0°; a right-angle bend is 90°. It cannot distinguish bending from hyperextension or measure clinical extension lag. Camera position, clothing, hidden joints and errors in estimated depth affect the result. The displayed coordinates are model estimates, not measured distances. 3D is not automatically more accurate than 2D.</p>
+        <p><strong>Prototype:</strong> this 3D implementation has not been clinically validated. They are not a diagnosis, recovery score or replacement for a physiotherapist's measurement. Saved readings last only until you reload this page.</p>
+        <p><strong>Save a reading:</strong> hold the position comfortably for a short average. Small movements are okay. Camera images stay in your browser; no video is recorded or uploaded.</p>
+        <p>Uses <a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker" target="_blank" rel="noopener noreferrer">MediaPipe</a>. Inspired by <a href="https://viviscool.github.io/knee_recovery/" target="_blank" rel="noopener noreferrer">Vivek's Knee Recovery</a>.</p>
+      </div>
+    </details>
+    <noscript><p class="error">JavaScript is needed to show the skeleton and knee angle. Enable it in your browser and reload.</p></noscript>
+  </main>
+  <script type="module" src="./src/app.mjs?v=3"></script>
+</body>
+</html>
