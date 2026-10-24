@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Model loading check</title>
+<body><h1>Model loading check</h1><p>This tests the actual bundled model and WebAssembly. No camera or patient images are used.</p><button id="run">Run model check</button><pre id="result">Not run</pre>
+<script type="module">
+import {FilesetResolver,PoseLandmarker} from '../vendor/vision_bundle.mjs';
+document.querySelector('#run').onclick=async()=>{
+  const out=document.querySelector('#result');out.textContent='Loading…';
+  let model;
+  try{
+    const files=await FilesetResolver.forVisionTasks('../vendor/wasm');
+    model=await PoseLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:'../models/pose_landmarker_full.task',delegate:'GPU'},runningMode:'VIDEO',numPoses:1});
+    const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#cccccc';ctx.fillRect(0,0,640,480);
+    const result=model.detectForVideo(canvas,performance.now());
+    out.textContent=`PASS: model loaded, inference completed, ${result.landmarks.length} poses on blank image. No real-camera validation.`;
+  }catch(e){out.textContent='FAIL: '+e.message;}finally{model?.close();}
+};
+</script></body></html>
