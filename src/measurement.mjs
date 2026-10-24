@@ -37,9 +37,30 @@ export class AngleWindow {
     if (!Number.isFinite(angle) || !Number.isFinite(time)) { this.reset(); return null; }
     if (this.lastTime != null && (time-this.lastTime > 400 || time <= this.lastTime)) this.reset();
     this.lastTime=time;
-    this.samples=this.samples.filter(p => time-p.time <= 250);
+    this.samples=this.samples.filter(p => time-p.time <= 700);
     this.samples.push({angle,time});
     return robustMean(this.samples.map(p=>p.angle));
+  }
+}
+
+// Smooth drawing coordinates only. Confidence remains current, so lost joints
+// disappear immediately instead of being kept visible by historical estimates.
+export class LandmarkSmoother {
+  constructor() { this.reset(); }
+  reset() { this.points=[]; this.lastTime=null; }
+  add(landmarks,time) {
+    if (!landmarks?.length || !Number.isFinite(time)) { this.reset(); return null; }
+    const dt=this.lastTime==null ? 0 : time-this.lastTime;
+    if (this.lastTime==null || dt<=0 || dt>400) this.points=[];
+    this.lastTime=time;
+    const alpha=1-Math.exp(-Math.max(0,dt)/160);
+    this.points=landmarks.map((point,index)=>{
+      if (!visible(point,0.35)) return null;
+      const previous=this.points[index];
+      if (!previous) return {...point};
+      return {...point,x:previous.x+alpha*(point.x-previous.x),y:previous.y+alpha*(point.y-previous.y)};
+    });
+    return this.points;
   }
 }
 

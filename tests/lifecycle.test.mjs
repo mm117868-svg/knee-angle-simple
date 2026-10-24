@@ -81,3 +81,16 @@ test('changing anatomical side cancels an in-progress capture',async()=>{
   assert.equal(h.el('capture').textContent,'Save a reading');assert.equal(h.el('angle').textContent,'--');
   assert.equal([...h.timers.values()].filter(t=>t.ms===4000).length,0);
 });
+
+test('readout updates slowly while invalid tracking still clears it immediately',async()=>{
+  const h=await harness();await h.ready();
+  const landmarks=Array.from({length:33},()=>({x:.5,y:.5,visibility:1,presence:1}));
+  landmarks[24].y=.1;landmarks[28].y=.9;
+  h.model.detectForVideo=()=>({landmarks:[landmarks]});h.frame(100);
+  assert.equal(h.el('angle').textContent,'0');
+  landmarks[28].x=.8;landmarks[28].y=.5;
+  h.frame(200);h.frame(300);assert.equal(h.el('angle').textContent,'0');
+  h.frame(400);assert.ok(Number(h.el('angle').textContent)>0 && Number(h.el('angle').textContent)<90);
+  h.model.detectForVideo=()=>({landmarks:[]});h.frame(500);assert.equal(h.el('angle').textContent,'--');
+  h.model.detectForVideo=()=>({landmarks:[landmarks]});h.frame(600);assert.equal(h.el('angle').textContent,'90');
+});

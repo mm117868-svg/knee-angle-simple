@@ -7,70 +7,60 @@
   <meta name="description" content="A simple, on-device knee-angle camera with a full-body skeleton. For iPhone and Mac.">
   <title>Knee Angle · Cambridge Kinematics</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=2">
 </head>
 <body>
   <main>
-    <header>
-      <a class="brand" href="./" aria-label="Knee Angle home"><img src="./icon.svg" width="38" height="38" alt=""><span>Knee Angle<small>Cambridge Kinematics</small></span></a>
-      <span class="badge">Camera prototype</span>
-    </header>
-    <section class="intro" aria-labelledby="title">
-      <h1>See your knee <em>move.</em></h1>
-      <p>Full-body skeleton. Live knee angle. Just your camera.</p>
-    </section>
+    <header><h1>Knee angle</h1></header>
     <section class="measurement" aria-label="Knee angle measurement">
       <div class="camera" id="camera-frame">
         <video id="video" autoplay muted playsinline aria-label="Live camera preview"></video>
         <canvas id="overlay" aria-label="Full-body pose skeleton with the selected leg highlighted"></canvas>
         <div class="camera-empty" id="camera-empty">
-          <svg viewBox="0 0 100 110" aria-hidden="true"><circle cx="50" cy="15" r="9"/><path d="M50 26V62M25 40L50 32L75 40M25 40L17 60M75 40L83 60M50 62L32 84L25 105M50 62L68 84L75 105"/><circle cx="32" cy="84" r="5"/><circle cx="68" cy="84" r="5"/></svg>
-          <strong>Your skeleton will appear here</strong>
-          <span>Place your phone or Mac side-on.<br>Keep your whole body, including both feet, in view.</span>
+          <span>Side-on view.<br>Keep your whole body in frame.</span>
         </div>
         <div class="camera-top"><span id="camera-label">Camera off</span><span id="leg-label">Right knee</span></div>
         <div class="live-reading">
-          <span class="live-label">LIVE KNEE BEND</span>
+          <span class="live-label">AVERAGE KNEE ANGLE</span>
           <div><output id="angle" aria-label="Live knee bend in degrees">--</output><span class="degree">°</span></div>
-          <span>0° = straight knee</span>
+          <span>Camera estimate · 0° = straight</span>
         </div>
       </div>
       <div class="panel">
         <div class="settings">
-          <label for="side">Knee to measure<select id="side"><option value="right">Right knee</option><option value="left">Left knee</option></select></label>
+          <label for="side">Knee<select id="side"><option value="right">Right knee</option><option value="left">Left knee</option></select></label>
           <label for="camera-choice">Camera<select id="camera-choice"><option value="user">Front / Mac</option><option value="environment">Back (phone)</option></select></label>
         </div>
-        <div class="status" role="status" aria-live="polite"><span id="status-dot"></span><p id="status">Ready when you are. Start the camera to begin.</p></div>
+        <div class="status" role="status" aria-live="polite"><span id="status-dot"></span><p id="status">Select a knee, then start the camera.</p></div>
         <div class="actions">
-          <button id="start" class="primary">Start camera <span aria-hidden="true">↗</span></button>
+          <button id="start" class="primary">Start camera</button>
           <button id="capture" disabled>Save a reading</button>
         </div>
-        <p class="capture-help" id="capture-help">Save a short average when your knee is in the position you want to measure. Small movements are okay.</p>
+        <p class="capture-help" id="capture-help" hidden></p>
         <section id="saved" class="saved" aria-label="Latest saved reading" hidden>
           <div class="saved-heading"><span>LAST READING</span><button id="clear" aria-label="Clear saved reading">Clear</button></div>
           <div class="saved-result"><strong id="saved-angle"></strong><span id="saved-meta"></span></div>
           <p id="saved-detail"></p>
         </section>
-        <p class="privacy"><span aria-hidden="true">●</span> Camera images stay in your browser. No video is recorded or uploaded.</p>
       </div>
     </section>
     <details>
-      <summary>Getting a useful reading</summary>
+      <summary>Help</summary>
       <div class="guidance">
         <ol>
           <li>Stand your iPhone or Mac securely to one side. The knee you select should face the camera. Keep one person in the picture.</li>
           <li>Allow camera access when asked. On iPhone, open this page in Safari. On Mac, use Safari or Chrome.</li>
           <li>Use good light and keep your hip, knee and ankle uncovered and visible. The orange line shows the measured leg; the pale lines show the rest of your skeleton.</li>
-          <li>Move within a comfortable range. The live angle uses a short average to reduce jitter. Stop the camera before moving the device.</li>
+          <li>Move within a comfortable range. The skeleton is smoothed between frames. The live angle averages the last 0.7 seconds and refreshes up to four times a second, so it will follow movement with a short delay. Stop the camera before moving the device.</li>
         </ol>
         <p><strong>What the number means:</strong> this is an approximate knee-bend angle from the side-on camera image. A straight leg is 0°; a right-angle bend is 90°. It cannot distinguish bending from hyperextension or measure clinical extension lag. Camera position, clothing and hidden joints affect the estimate.</p>
         <p><strong>Prototype:</strong> these camera estimates have not been clinically validated. They are not a diagnosis, recovery score or replacement for a physiotherapist's measurement. Saved readings last only until you reload this page.</p>
-        <p>Built with <a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker" target="_blank" rel="noopener noreferrer">Google MediaPipe Pose Landmarker</a>. A simplified measurement page inspired by <a href="https://viviscool.github.io/knee_recovery/" target="_blank" rel="noopener noreferrer">Vivek's Knee Recovery</a>.</p>
+        <p><strong>Save a reading:</strong> hold the position comfortably for a short average. Small movements are okay. Camera images stay in your browser; no video is recorded or uploaded.</p>
+        <p>Uses <a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker" target="_blank" rel="noopener noreferrer">MediaPipe</a>. Inspired by <a href="https://viviscool.github.io/knee_recovery/" target="_blank" rel="noopener noreferrer">Vivek's Knee Recovery</a>.</p>
       </div>
     </details>
-    <footer><span>Simple movement measurement</span><span>iPhone · Mac</span></footer>
     <noscript><p class="error">JavaScript is needed to show the skeleton and knee angle. Enable it in your browser and reload.</p></noscript>
   </main>
-  <script type="module" src="./src/app.mjs"></script>
+  <script type="module" src="./src/app.mjs?v=2"></script>
 </body>
 </html>

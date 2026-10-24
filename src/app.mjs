@@ -1,10 +1,12 @@
-import { SIDES, CONNECTIONS, visible, kneeBend, AngleWindow, summariseReading } from './measurement.mjs';
+import { SIDES, CONNECTIONS, visible, kneeBend, AngleWindow, LandmarkSmoother, summariseReading } from './measurement.mjs?v=2';
 
 const $ = id => document.getElementById(id);
 const video=$('video'), canvas=$('overlay'), ctx=canvas.getContext('2d');
 const smoother=new AngleWindow();
+const skeletonSmoother=new LandmarkSmoother();
 let state='idle', generation=0, stream=null, model=null, raf=0;
 let lastVideoTime=-1, lastFrameAt=0, lastGoodAt=0, capture=null, captureTimer=0;
+let lastReadoutAt=null;
 
 function status(message,tone='') {
   if ($('status').textContent !== message) $('status').textContent=message;
@@ -12,12 +14,13 @@ function status(message,tone='') {
 }
 
 function clearAngle() {
-  smoother.reset(); lastGoodAt=0;
+  smoother.reset(); lastGoodAt=0; lastReadoutAt=null;
   $('angle').textContent='--'; $('capture').disabled=true;
 }
 
 function cancelCapture(message) {
   capture=null; clearTimeout(captureTimer);
+  $('capture-help').hidden=true;
   $('capture').textContent='Save a reading';
   if (message) status(message);
 }
@@ -28,6 +31,7 @@ function stop(message='Camera stopped. Your last saved reading stays below.') {
   video.pause(); video.srcObject=null;
   try { model?.close(); } catch { /* Camera release must still complete. */ }
   model=null;
+  skeletonSmoother.reset(); lastFrameAt=0;
   ctx.clearRect(0,0,canvas.width,canvas.height); clearAngle();
   $('start').textContent='Start camera'; $('camera-choice').disabled=false;
   $('camera-empty').hidden=false; $('camera-label').textContent='Camera off';
@@ -132,7 +136,6 @@ function finishCapture() {
   $('saved-meta').textContent=`${data.side==='left'?'Left':'Right'} knee · ${time}`;
   $('saved-detail').textContent=`Average of ${result.count} clear frames. Observed bend: ${Math.round(result.min)}° to ${Math.round(result.max)}°. Camera estimate.`;
   $('saved').hidden=false;
-  $('capture-help').textContent=`Reading saved: ${Math.round(result.angle)}° of ${data.side} knee bend. The live angle continues above.`;
   status('Reading saved. You can relax your leg.','good');
 }
 
@@ -141,17 +144,20 @@ function loop(now) {
   if (video.readyState>=2 && video.currentTime!==lastVideoTime && now-lastFrameAt>=65) {
     lastVideoTime=video.currentTime;lastFrameAt=now;
     try {
-      if(canvas.width!==video.videoWidth || canvas.height!==video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;}
+      if(canvas.width!==video.videoWidth || canvas.height!==video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;skeletonSmoother.reset();clearAngle();}
       const result=model.detectForVideo(video,now);
       const landmarks=result.landmarks?.[0],side=$('side').value;
-      drawSkeleton(landmarks,side);
+      drawSkeleton(skeletonSmoother.add(landmarks,now),side);
       const angle=kneeBend(landmarks,side,video.videoWidth,video.videoHeight);
       if (angle==null) {
         clearAngle();
         if (!capture) status(`Bring your ${side} hip, knee and ankle clearly into view.`);
       } else {
         const average=smoother.add(angle,now);lastGoodAt=now;
-        $('angle').textContent=String(Math.round(average));
+        // Refresh at most four times a second, while averaging every usable frame.
+        if(lastReadoutAt==null || now-lastReadoutAt>=250){
+          $('angle').textContent=String(Math.round(average)); lastReadoutAt=now;
+        }
         $('capture').disabled=!!capture;
         if (capture) {
           capture.samples.push({angle,time:now});
@@ -159,7 +165,7 @@ function loop(now) {
           status(`Taking a reading. Hold comfortably for ${remaining} more ${remaining===1?'second':'seconds'}.`,'busy');
           if(now-capture.started>=2000 && summariseReading(capture.samples)) finishCapture();
         } else if(!['Reading saved. You can relax your leg.'].includes($('status').textContent)) {
-          status(`${side==='left'?'Left':'Right'} knee in view. Move gently to see the angle change.`,'good');
+          status(`${side==='left'?'Left':'Right'} knee tracked.`,'good');
         }
       }
     } catch {stop('The movement model stopped. Start the camera to try again.');return;}
@@ -172,20 +178,21 @@ $('capture').addEventListener('click',()=>{
   if(state!=='running'||capture||performance.now()-lastGoodAt>700)return;
   capture={side:$('side').value,started:performance.now(),samples:[]};
   $('capture').disabled=true; $('capture').textContent='Taking reading…';
+  $('capture-help').hidden=false;
   $('capture-help').textContent='Keep this position as comfortably as you can. Small movements are okay.';
   status('Taking a short average. Hold comfortably.','busy');
   captureTimer=setTimeout(finishCapture,4000);
 });
 $('side').addEventListener('change',()=>{
-  cancelCapture();clearAngle();ctx.clearRect(0,0,canvas.width,canvas.height);
+  cancelCapture();clearAngle();skeletonSmoother.reset();ctx.clearRect(0,0,canvas.width,canvas.height);
   $('leg-label').textContent=$('side').selectedOptions[0].textContent;
   status(state==='running'?`Measuring the ${$('side').value} knee. Keep that side facing the camera.`:'Ready when you are. Start the camera to begin.');
 });
-$('clear').addEventListener('click',()=>{$('saved').hidden=true;$('capture-help').textContent='Save a short average when your knee is in the position you want to measure. Small movements are okay.';});
+$('clear').addEventListener('click',()=>{$('saved').hidden=true;});
 // A frozen camera must not leave a stale angle labelled as live.
 setInterval(()=>{
-  if(state==='running' && lastGoodAt && performance.now()-lastGoodAt>700){
-    clearAngle();ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(state==='running' && lastFrameAt && performance.now()-lastFrameAt>700){
+    clearAngle();skeletonSmoother.reset();lastFrameAt=0;ctx.clearRect(0,0,canvas.width,canvas.height);
     status('Waiting for a fresh view of the knee. Keep your leg visible.');
   }
 },250);
